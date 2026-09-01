@@ -5,7 +5,6 @@ import { useApiData } from '../../lib/useApiData.js';
 import { formatUpdatedAt } from '../../lib/format.js';
 import { FALLBACK_RATES } from '../../data/fallbackData.js';
 import RatesTable from '../common/RatesTable.jsx';
-
 const TABS = [
   { id: 'currency', label: 'Currency rates' },
   { id: 'travel_card', label: 'Travel card rates' },
@@ -71,3 +70,7 @@ export default function LiveRatesSection() {
     </section>
   );
 }
+
+
+
+

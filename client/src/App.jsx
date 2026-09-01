@@ -8,7 +8,7 @@ import NewsPage from './pages/NewsPage.jsx';
 import FaqPage from './pages/FaqPage.jsx';
 import ContactPage from './pages/ContactPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
-
+import OutwardRemittance from './pages/OutwardRemittance.jsx';
 export default function App() {
   return (
     <Routes>
@@ -21,6 +21,7 @@ export default function App() {
         <Route path="faqs" element={<FaqPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="*" element={<NotFoundPage />} />
+        <Route path="outwardRemittance" element={<OutwardRemittance />} />
       </Route>
     </Routes>
   );

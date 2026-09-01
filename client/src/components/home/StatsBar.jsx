@@ -1,6 +1,4 @@
 import { HOME_STATS } from '../../data/siteContent.js';
-
-/** Four-figure strip that sits directly under the hero. */
 export default function StatsBar() {
   return (
     <section className="border-y border-brand-100 bg-brand-50/70">

@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom';
 import SectionHeading from '../common/SectionHeading.jsx';
 import { HOME_SERVICES } from '../../data/siteContent.js';
-
-/** Three service cards on the deep blue band. */
 export default function ServicesSection() {
   return (
     <section className="py-16 sm:py-20">

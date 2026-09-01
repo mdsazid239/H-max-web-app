@@ -4,15 +4,7 @@ import { useApiData } from '../../lib/useApiData.js';
 import { formatRupees } from '../../lib/format.js';
 import { FALLBACK_CURRENCIES, FALLBACK_RATES } from '../../data/fallbackData.js';
 import FormStatus from '../common/FormStatus.jsx';
-
 const EMPTY_FORM = { amount: '', mobile: '', email: '', acceptsPolicy: false };
-
-/**
- * Rate calculator and lead form from the hero panel.
- *
- * The amount is converted in the browser for instant feedback, but the
- * server re-prices the request against the live rate before saving it.
- */
 export default function QuoteForm() {
   const [transactionType, setTransactionType] = useState('buy');
   const [productType, setProductType] = useState('currency');
@@ -20,7 +12,6 @@ export default function QuoteForm() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [status, setStatus] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const { data: currencies } = useApiData(
     () => api.getCurrencies().then((result) => result.currencies),
     FALLBACK_CURRENCIES,
@@ -223,16 +214,13 @@ export default function QuoteForm() {
           />
           I accept the Privacy Policy
         </label>
-
         <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
           {isSubmitting ? 'Sending…' : 'Get quote'}
         </button>
-
         <p className="text-center text-[11px] text-ink-muted">
           No hidden charges · Rate held for 30 mins
         </p>
       </form>
-
       <FormStatus type={status?.type} message={status?.message} />
     </div>
   );

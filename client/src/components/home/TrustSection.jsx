@@ -1,7 +1,5 @@
 import SectionHeading from '../common/SectionHeading.jsx';
 import { TRUST_BADGES, TRUST_VALUES } from '../../data/siteContent.js';
-
-/** "A partner you can trust" — six value cards plus the credentials strip. */
 export default function TrustSection() {
   return (
     <section className="py-16 sm:py-20">
@@ -11,7 +9,6 @@ export default function TrustSection() {
           title="A partner you can trust"
           description="Since 2016, HMAX has built its reputation on six foundational values that guide every transaction."
         />
-
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {TRUST_VALUES.map((value) => (
             <article key={value.title} className="rounded-xl bg-brand-600 p-6 text-white">
