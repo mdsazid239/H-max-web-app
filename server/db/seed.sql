@@ -124,3 +124,16 @@ INSERT INTO branches (label, address, city, pincode, phones, email, map_url, dis
    '1st Floor, Office No. 3, Guru Prasad Building, Near Chhatrapati Shivaji Maharaj Statue, Manpada Road, Dombivli East',
    'Mumbai', '421201', '9136926325,9321627630', 'hmaxdombivli@gmail.com',
    'https://maps.google.com/?q=Guru+Prasad+Building+Manpada+Road+Dombivli+East', 2);
+
+
+ALTER DATABASE your_db_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+ALTER TABLE currencies
+  CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+ALTER TABLE currencies
+  MODIFY flag_emoji VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- If rows were already corrupted (double-encoded) before this fix,
+-- converting the column won't repair them — re-insert the correct
+-- emoji values for the affected rows after running the above.

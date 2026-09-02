@@ -15,6 +15,7 @@ export const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   timezone: 'Z',
+  charset: 'utf8mb4',
   // Return DECIMAL columns as JavaScript numbers instead of strings so the
   // frontend can format them without extra parsing.
   decimalNumbers: true,

@@ -1,11 +1,4 @@
-/**
- * Thin wrapper around fetch for every call to the Express API.
- *
- * In development VITE_API_BASE_URL is empty and Vite proxies /api to
- * localhost:4000. In production it points at the deployed API.
- */
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-
 async function request(path, options = {}) {
   const response = await fetch(`${BASE_URL}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -29,6 +22,9 @@ export const api = {
   getNews: () => request('/news'),
   getFaqs: (category) => request(`/faqs${category ? `?category=${category}` : ''}`),
   getBranches: () => request('/contact/branches'),
+
+  sendOtp: (body) =>
+    request('/otp/send', { method: 'POST', body: JSON.stringify(body) }),
 
   submitQuote: (body) =>
     request('/quotes', { method: 'POST', body: JSON.stringify(body) }),

@@ -28,6 +28,9 @@ export const env = {
     password: read('DB_PASSWORD', ''),
     database: read('DB_NAME', 'hmax_forex'),
   },
+
+  // No fallback — an OTP secret must be explicitly set, never defaulted.
+  otpSecret: read('OTP_SECRET'),
 };
 
 export const isProduction = env.nodeEnv === 'production';
