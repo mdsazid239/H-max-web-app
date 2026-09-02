@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useApiData } from '../lib/useApiData.js';
@@ -7,7 +7,7 @@ import { FALLBACK_RATES } from '../data/fallbackData.js';
 import Award from '../assets/images/award.png';
 import Global from '../assets/images/global.png';
 import Notebook from '../assets/images/notebook.png';
-import wired from '../assets/images/Group.png';
+import Wired from '../assets/images/Group.png';
 import AED from '../assets/images/AED.png';
 import AUD from '../assets/images/AUD.png';
 import CHF from '../assets/images/CHF.png';
@@ -19,48 +19,109 @@ import BookWord from '../assets/images/book-word.png';
 import BookWordN from '../assets/images/book-word1.png';
 import BookWordNT from '../assets/images/book-word2.png';
 import BookWordNL from '../assets/images/book-word3.png';
-import Atm from '../assets/images/atm-card.png';
-import AtmN from '../assets/images/atm-card1.png';
-import Bulding from '../assets/images/bullinding.png';
+import CleanUpOne from '../assets/images/clean-up1.png';
+import CleanUpTwo from '../assets/images/clean-up2.png';
+import CleanUpThree from '../assets/images/clean-up3.png';
 import Increase from '../assets/images/increase.png';
 import Wonder from '../assets/images/wonder.png';
+import Payout from '../assets/images/polarish.png';
+import BuyBack from '../assets/images/polarish1.png';
+import CardBalance from '../assets/images/polarish3.png';
+import Valuation from '../assets/images/polarish4.png';
 import {
   BUYING_BENEFITS,
   DOCUMENT_REQUIREMENTS,
   SELLING_BENEFITS,
 } from '../data/siteContent.js';
 
-/* Flag artwork for the rate tables and the converter, keyed on currency code. */
+/*
+ * Flag artwork, keyed on currency code.
+ *
+ * This map is the board: only these six codes from the design are quoted, and
+ * they are quoted in this order. Anything else the feed publishes is left off.
+ * To add a currency, drop its flag into assets and add it here — the artwork
+ * and its place in the running order come together.
+ */
 const CURRENCY_FLAGS = { AED, AUD, CHF, EUR, GBP, USD };
+const BOARD_ORDER = Object.keys(CURRENCY_FLAGS);
 
 const HIGHLIGHTS = [
   { image: Award, label: 'Excellent Rates' },
   { image: Global, label: 'Over 30 Currencies' },
   { image: Notebook, label: 'Convenient Multi-currency Card' },
-  { image: wired, label: 'Reliable Customer Service' },
+  { image: Wired, label: 'Reliable Customer Service' },
 ];
 
 /* Icons follow the same order as the benefit copy in siteContent.js. */
 const BUYING_ICONS = [BookWord, BookWordN, BookWordNT, BookWordNL];
-const SELLING_ICONS = [Atm, AtmN, Bulding, Increase];
+const SELLING_ICONS = [Payout, BuyBack, CardBalance, Valuation];
 
+/*
+ * The three cards that close the page. Each one carries its own clean-up
+ * artwork, so the cards no longer borrow icons from the highlights row or the
+ * converter — a change to one of those does not quietly change a card here.
+ */
 const PROMO_CARDS = [
   {
-    image: MobileCurrency,
+    image: CleanUpOne,
     title: 'Personalized Currency Exchange Solutions at Your Doorstep',
     to: '/contact',
   },
   {
-    image: Global,
+    image: CleanUpTwo,
     title: 'Stay Informed with Real-Time Exchange Rates for Over 30 Currencies',
     to: '/currency-exchange',
   },
   {
-    image: AtmN,
+    image: CleanUpThree,
     title: 'Simplify Your Travels with a Single Card for Multiple Currencies',
     to: '/services',
   },
 ];
+
+/* Amounts are shown the way a rate board shows them: two decimals, thousands grouped. */
+const inrFormatter = new Intl.NumberFormat('en-IN', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function formatAmount(value) {
+  return inrFormatter.format(Number.isFinite(value) ? value : 0);
+}
+
+/*
+ * The API and the fallback data both name the columns `buyRate` and `sellRate`.
+ * Older payloads used `buy` / `sell`, so accept either and always hand back a
+ * number.
+ */
+function rateValue(rate, side) {
+  const raw = side === 'buy' ? (rate?.buyRate ?? rate?.buy) : (rate?.sellRate ?? rate?.sell);
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isBoardCurrency(rate) {
+  return BOARD_ORDER.includes(rate.code);
+}
+
+/*
+ * Only board currencies are quoted, and only when they carry a rate on at
+ * least one side — a currency with nothing on either side is not quotable, so
+ * it is left off rather than printed as 0.00. An empty result means the feed
+ * has not published yet, so fall back to the seeded figures. The fallback is
+ * filtered too, so an extra code there cannot reach the board either.
+ */
+function prepareRates(rates, fallback) {
+  const source = Array.isArray(rates) ? rates : [];
+  const quotable = source.filter(
+    (rate) =>
+      isBoardCurrency(rate) && (rateValue(rate, 'buy') > 0 || rateValue(rate, 'sell') > 0),
+  );
+
+  return (quotable.length ? quotable : fallback.filter(isBoardCurrency)).sort(
+    (a, b) => BOARD_ORDER.indexOf(a.code) - BOARD_ORDER.indexOf(b.code),
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Section backdrop                                                    */
@@ -68,9 +129,6 @@ const PROMO_CARDS = [
 
 /*
  * The faint chart artwork that washes across a whole section in the design.
- * It fills the section rather than sitting in one corner, so `object-cover`
- * plus `inset-0` is the default and each caller only sets its opacity.
- *
  * Decoration only: hidden from screen readers and ignores pointer events.
  * The parent section must be `relative overflow-hidden`, and the content
  * inside it needs `relative` so it paints on top.
@@ -92,69 +150,94 @@ function SectionBackdrop({ className }) {
 /* Rate table                                                          */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Every quoted currency has local artwork, so the flag slot is a fixed box
+ * that clips its image. That keeps the flag column aligned and stops the code
+ * and name beside it from ever being painted over.
+ */
+function CurrencyCell({ code, name }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-brand-50 ring-1 ring-inset ring-brand-100"
+      >
+        <img src={CURRENCY_FLAGS[code]} alt="" className="h-full w-full object-cover" />
+      </span>
+
+      <span className="min-w-0">
+        <span className="block text-sm font-bold leading-tight text-ink">{code}</span>
+        <span className="block truncate text-xs leading-tight text-ink-muted">{name}</span>
+      </span>
+    </div>
+  );
+}
+
 function RateTable({ title, rates, isLoading }) {
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-card sm:p-6">
+    <div className="flex h-full flex-col rounded-2xl bg-white p-4 shadow-card sm:p-6">
       <h2 className="text-center text-lg font-bold text-brand-700 sm:text-xl">{title}</h2>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[300px] border-collapse text-left">
-          <thead>
-            <tr className="bg-brand-600 text-white">
-              <th className="rounded-l-md px-3 py-2.5 text-xs font-semibold sm:px-4 sm:text-sm">
-                Currency
-              </th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold sm:px-4 sm:text-sm">
-                Buy
-              </th>
-              <th className="rounded-r-md px-3 py-2.5 text-right text-xs font-semibold sm:px-4 sm:text-sm">
-                Sell
-              </th>
-            </tr>
-          </thead>
+      <table className="mt-5 w-full table-fixed border-collapse text-left">
+        <caption className="sr-only">
+          {title}. Buy and sell rates in Indian rupees for one unit of each currency.
+        </caption>
 
-          <tbody>
-            {isLoading
-              ? Array.from({ length: 6 }, (_, index) => (
-                  <tr key={index} className="border-b border-brand-50 last:border-0">
-                    <td className="px-3 py-3.5 sm:px-4" colSpan={3}>
-                      <div className="h-5 w-full animate-pulse rounded bg-brand-50" />
-                    </td>
-                  </tr>
-                ))
-              : rates.map((rate) => (
-                  <tr key={rate.code} className="border-b border-brand-50 last:border-0">
-                    <td className="px-3 py-3 sm:px-4">
-                      <div className="flex items-center gap-3">
-                        {CURRENCY_FLAGS[rate.code] ? (
-                          <img
-                            src={CURRENCY_FLAGS[rate.code]}
-                            alt=""
-                            aria-hidden="true"
-                            className="h-6 w-8 shrink-0 rounded-sm object-cover"
-                          />
-                        ) : null}
+        <colgroup>
+          <col className="w-1/2" />
+          <col className="w-1/4" />
+          <col className="w-1/4" />
+        </colgroup>
 
-                        <span className="leading-tight">
-                          <span className="block text-sm font-bold text-brand-700">
-                            {rate.code}
-                          </span>
-                          <span className="block text-[11px] text-ink-muted">{rate.name}</span>
-                        </span>
-                      </div>
-                    </td>
+        <thead>
+          <tr className="bg-brand-600 text-white">
+            <th
+              scope="col"
+              className="rounded-l-md px-3 py-2.5 text-xs font-semibold sm:px-4 sm:text-sm"
+            >
+              Currency
+            </th>
+            <th
+              scope="col"
+              className="px-2 py-2.5 text-right text-xs font-semibold sm:px-4 sm:text-sm"
+            >
+              Buy
+            </th>
+            <th
+              scope="col"
+              className="rounded-r-md px-2 py-2.5 text-right text-xs font-semibold sm:px-4 sm:text-sm"
+            >
+              Sell
+            </th>
+          </tr>
+        </thead>
 
-                    <td className="px-3 py-3 text-right text-sm font-semibold text-ink sm:px-4">
-                      {rate.buy}
-                    </td>
-                    <td className="px-3 py-3 text-right text-sm font-semibold text-ink sm:px-4">
-                      {rate.sell}
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
+        <tbody>
+          {isLoading
+            ? Array.from({ length: BOARD_ORDER.length }, (_, index) => (
+                <tr key={index} className="border-b border-brand-50 last:border-0">
+                  <td className="px-3 py-3 sm:px-4" colSpan={3}>
+                    <div className="h-6 w-full animate-pulse rounded bg-brand-50" />
+                    <span className="sr-only">Loading rates</span>
+                  </td>
+                </tr>
+              ))
+            : rates.map((rate) => (
+                <tr key={rate.code} className="border-b border-brand-50 last:border-0">
+                  <td className="px-3 py-2.5 sm:px-4">
+                    <CurrencyCell code={rate.code} name={rate.name} />
+                  </td>
+
+                  <td className="px-2 py-2.5 text-right text-sm font-semibold tabular-nums text-ink sm:px-4">
+                    {formatAmount(rateValue(rate, 'buy'))}
+                  </td>
+                  <td className="px-2 py-2.5 text-right text-sm font-semibold tabular-nums text-ink sm:px-4">
+                    {formatAmount(rateValue(rate, 'sell'))}
+                  </td>
+                </tr>
+              ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -168,6 +251,14 @@ const PRODUCT_TYPES = [
   { value: 'travel_card', label: 'Travel Card' },
 ];
 
+const MODES = [
+  { value: 'buy', label: 'Buy Forex' },
+  { value: 'sell', label: 'Sell Forex' },
+];
+
+const fieldClass =
+  'w-full rounded-md border border-brand-100 bg-white px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20';
+
 function ConverterCard({ counterRates, cardRates }) {
   const [mode, setMode] = useState('buy');
   const [productType, setProductType] = useState('currency');
@@ -176,42 +267,60 @@ function ConverterCard({ counterRates, cardRates }) {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [acceptsPolicy, setAcceptsPolicy] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const rates = productType === 'travel_card' ? cardRates : counterRates;
+
+  /* Travel cards do not always carry every counter currency, so fall back to
+     the first available code instead of leaving the select on a dead value. */
+  useEffect(() => {
+    if (rates.length && !rates.some((rate) => rate.code === currencyCode)) {
+      setCurrencyCode(rates[0].code);
+    }
+  }, [rates, currencyCode]);
 
   const selectedRate = useMemo(
     () => rates.find((rate) => rate.code === currencyCode) ?? rates[0],
     [rates, currencyCode],
   );
 
+  const appliedRate = rateValue(selectedRate, mode);
+
   const inrValue = useMemo(() => {
     const parsedAmount = Number.parseFloat(amount);
-    if (!selectedRate || Number.isNaN(parsedAmount)) return 0;
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return 0;
+    return parsedAmount * appliedRate;
+  }, [amount, appliedRate]);
 
-    const rate = mode === 'buy' ? selectedRate.buy : selectedRate.sell;
-    return parsedAmount * Number(rate);
-  }, [amount, mode, selectedRate]);
-
-  const canSubmit = Boolean(amount) && Boolean(mobile) && Boolean(email) && acceptsPolicy;
+  const isValidMobile = /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, ''));
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+  const hasAmount = Number.parseFloat(amount) > 0;
+  const canSubmit = hasAmount && isValidMobile && isValidEmail && acceptsPolicy;
 
   function handleSubmit() {
+    if (!canSubmit) return;
+
     // Wire this to the quote endpoint once the backend route is live.
     console.log({ mode, productType, currencyCode, amount, mobile, email });
+    setIsSubmitted(true);
   }
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-card sm:p-6">
       {/* Buy / sell toggle */}
-      <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-brand-100">
-        {[
-          { value: 'buy', label: 'Buy Forex' },
-          { value: 'sell', label: 'Sell Forex' },
-        ].map((tab) => (
+      <div
+        role="tablist"
+        aria-label="Quote type"
+        className="grid grid-cols-2 overflow-hidden rounded-lg border border-brand-100"
+      >
+        {MODES.map((tab) => (
           <button
             key={tab.value}
             type="button"
+            role="tab"
+            aria-selected={mode === tab.value}
             onClick={() => setMode(tab.value)}
-            className={`py-2.5 text-sm font-semibold transition-colors ${
+            className={`py-2.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600 ${
               mode === tab.value ? 'bg-brand-600 text-white' : 'bg-white text-ink-muted'
             }`}
           >
@@ -229,7 +338,7 @@ function ConverterCard({ counterRates, cardRates }) {
             id="product-type"
             value={productType}
             onChange={(event) => setProductType(event.target.value)}
-            className="mt-1.5 w-full rounded-md border border-brand-100 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-600"
+            className={`mt-1.5 ${fieldClass}`}
           >
             {PRODUCT_TYPES.map((product) => (
               <option key={product.value} value={product.value}>
@@ -247,7 +356,7 @@ function ConverterCard({ counterRates, cardRates }) {
             id="currency"
             value={currencyCode}
             onChange={(event) => setCurrencyCode(event.target.value)}
-            className="mt-1.5 w-full rounded-md border border-brand-100 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-600"
+            className={`mt-1.5 ${fieldClass}`}
           >
             {rates.map((rate) => (
               <option key={rate.code} value={rate.code}>
@@ -257,28 +366,39 @@ function ConverterCard({ counterRates, cardRates }) {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-md border border-brand-100 px-3 py-2">
-            <span className="text-[11px] text-ink-muted">{currencyCode}</span>
+        {/* Amount in / amount out. Stacks on very narrow phones. */}
+        <div className="grid gap-3 min-[380px]:grid-cols-2">
+          <div className="rounded-md border border-brand-100 px-3 py-2 focus-within:border-brand-600">
+            <label htmlFor="amount" className="block text-[11px] text-ink-muted">
+              {currencyCode}
+            </label>
             <input
+              id="amount"
               type="number"
               inputMode="decimal"
               min="0"
+              step="0.01"
               placeholder="0.00"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
-              aria-label={`Amount in ${currencyCode}`}
-              className="w-full border-0 p-0 text-base font-semibold outline-none"
+              className="w-full border-0 p-0 text-base font-semibold text-ink outline-none"
             />
           </div>
 
           <div className="rounded-md border border-brand-100 bg-brand-50/50 px-3 py-2">
-            <span className="text-[11px] text-ink-muted">INR</span>
-            <p className="text-base font-semibold text-brand-700">
-              ₹ {inrValue.toFixed(2)}
+            <span className="block text-[11px] text-ink-muted">INR</span>
+            <p aria-live="polite" className="text-base font-semibold tabular-nums text-brand-700">
+              &#8377; {formatAmount(inrValue)}
             </p>
           </div>
         </div>
+
+        {selectedRate ? (
+          <p className="text-[11px] text-ink-muted">
+            1 {selectedRate.code} = &#8377; {formatAmount(appliedRate)} &middot;{' '}
+            {mode === 'buy' ? 'you buy from us' : 'you sell to us'}
+          </p>
+        ) : null}
       </div>
 
       {/* Contact details */}
@@ -288,19 +408,22 @@ function ConverterCard({ counterRates, cardRates }) {
         <div className="mt-3 space-y-3">
           <input
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             placeholder="Mobile Number"
             value={mobile}
             onChange={(event) => setMobile(event.target.value)}
             aria-label="Mobile number"
-            className="w-full rounded-md border border-brand-100 px-3 py-2.5 text-sm outline-none focus:border-brand-600"
+            className={fieldClass}
           />
           <input
             type="email"
+            autoComplete="email"
             placeholder="Email Address"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             aria-label="Email address"
-            className="w-full rounded-md border border-brand-100 px-3 py-2.5 text-sm outline-none focus:border-brand-600"
+            className={fieldClass}
           />
         </div>
 
@@ -323,12 +446,16 @@ function ConverterCard({ counterRates, cardRates }) {
           type="button"
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="mt-4 w-full rounded-md bg-brand-600 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+          className="mt-4 w-full rounded-md bg-brand-600 py-3 text-sm font-semibold text-white transition-opacity hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Get Quote
         </button>
 
-        <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1 text-[11px] text-ink-muted">
+        <p aria-live="polite" className="mt-2 min-h-[1rem] text-center text-[11px] text-brand-700">
+          {isSubmitted ? 'Quote request sent. Our team will call you shortly.' : ''}
+        </p>
+
+        <div className="mt-2 flex flex-wrap justify-center gap-x-5 gap-y-1 text-[11px] text-ink-muted">
           <span>No hidden charges</span>
           <span>Rate held for 30 mins</span>
         </div>
@@ -341,16 +468,21 @@ function ConverterCard({ counterRates, cardRates }) {
 /* Benefit row                                                         */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Icon left, copy right. The list is `w-fit` and centred, so all four rows
+ * share one left edge instead of each centring itself.
+ */
 function BenefitRow({ image, text }) {
   return (
-    <li className="flex items-center gap-4 sm:gap-6">
+    <li className="flex items-center gap-5">
       <img
         src={image}
         alt=""
         aria-hidden="true"
-        className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14"
+        loading="lazy"
+        className="h-14 w-14 shrink-0 object-contain"
       />
-      <span className="text-sm leading-relaxed sm:text-base">{text}</span>
+      <span className="max-w-[16rem] text-sm leading-snug sm:max-w-xs sm:text-base">{text}</span>
     </li>
   );
 }
@@ -360,14 +492,24 @@ function BenefitRow({ image, text }) {
 /* ------------------------------------------------------------------ */
 
 export default function CurrencyExchangePage() {
-  const { data: counterRates, isLoading: isLoadingCounter } = useApiData(
+  const { data: counterData, isLoading: isLoadingCounter } = useApiData(
     () => api.getRates('currency'),
     { rates: FALLBACK_RATES.currency, updatedAt: null },
   );
 
-  const { data: cardRates, isLoading: isLoadingCard } = useApiData(
+  const { data: cardData, isLoading: isLoadingCard } = useApiData(
     () => api.getRates('travel_card'),
     { rates: FALLBACK_RATES.travel_card, updatedAt: null },
+  );
+
+  const counterRates = useMemo(
+    () => prepareRates(counterData.rates, FALLBACK_RATES.currency),
+    [counterData.rates],
+  );
+
+  const cardRates = useMemo(
+    () => prepareRates(cardData.rates, FALLBACK_RATES.travel_card),
+    [cardData.rates],
   );
 
   return (
@@ -390,7 +532,7 @@ export default function CurrencyExchangePage() {
         {/* Left-to-right fade so the copy always sits on a calm background. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-brand-50 via-brand-50/85 to-transparent sm:via-brand-50/60 sm:to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-brand-50 via-brand-50/85 to-transparent sm:via-brand-50/60"
         />
 
         <div className="container-page relative py-14 sm:py-20 lg:py-24">
@@ -403,7 +545,7 @@ export default function CurrencyExchangePage() {
               needs
             </h1>
 
-            <p className="mt-5 text-sm leading-relaxed text-ink-muted sm:text-base">
+            <p className="mt-5 max-w-prose text-sm leading-relaxed text-ink-muted sm:text-base">
               At Hmax Money Exchange Pvt Ltd we offer a number of flexible and convenient
               foreign currency exchange solutions, at great rates. Our currency exchange caters
               for everyone from individuals to corporates for their travel needs, and to
@@ -414,18 +556,19 @@ export default function CurrencyExchangePage() {
         </div>
       </section>
 
-      {/* Highlights — four cards in a row */}
+      {/* Highlights — two up on phones, four across from large screens */}
       <section className="py-10 sm:py-12">
         <div className="container-page grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
           {HIGHLIGHTS.map((highlight) => (
             <div
               key={highlight.label}
-              className="flex flex-col items-center justify-start gap-4 rounded-xl border border-brand-200 bg-white px-4 py-7 text-center sm:px-5 sm:py-8"
+              className="flex h-full flex-col items-center justify-start gap-4 rounded-xl border border-brand-200 bg-white px-4 py-7 text-center sm:px-5 sm:py-8"
             >
               <img
                 src={highlight.image}
                 alt=""
                 aria-hidden="true"
+                loading="lazy"
                 className="h-12 w-12 object-contain sm:h-14 sm:w-14"
               />
               <p className="text-xs font-semibold leading-snug text-brand-700 sm:text-sm">
@@ -436,25 +579,25 @@ export default function CurrencyExchangePage() {
         </div>
       </section>
 
-      {/* Rate tables */}
+      {/* Rate tables — a matched pair, so both cards stretch to the same height */}
       <section className="bg-brand-50/70 py-12 sm:py-14">
-        <div className="container-page grid gap-5 lg:grid-cols-2 lg:gap-6">
+        <div className="container-page grid items-stretch gap-5 lg:grid-cols-2 lg:gap-6">
           <RateTable
             title="Latest Currency Exchange Rates"
-            rates={counterRates.rates}
+            rates={counterRates}
             isLoading={isLoadingCounter}
           />
           <RateTable
             title="Latest Travel Card Rates"
-            rates={cardRates.rates}
+            rates={cardRates}
             isLoading={isLoadingCard}
           />
         </div>
 
         <div className="container-page mt-5 flex flex-col gap-2 text-center text-xs text-brand-700 sm:flex-row sm:items-center sm:justify-between sm:text-left">
           <p>
-            {counterRates.updatedAt
-              ? `Last updated rates at ${formatUpdatedAt(counterRates.updatedAt)}`
+            {counterData.updatedAt
+              ? `Last updated rates at ${formatUpdatedAt(counterData.updatedAt)}`
               : 'Rates refreshed through the day'}
           </p>
           <p>1 FX = Displayed INR</p>
@@ -475,14 +618,14 @@ export default function CurrencyExchangePage() {
 
           <div className="mt-10 grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
             <div className="mx-auto w-full max-w-md lg:mx-0">
-              <ConverterCard counterRates={counterRates.rates} cardRates={cardRates.rates} />
+              <ConverterCard counterRates={counterRates} cardRates={cardRates} />
             </div>
 
-            <div className="flex justify-center">
+            <div className="order-first flex justify-center lg:order-none">
               <img
                 src={MobileCurrency}
                 alt="Currency exchange on a mobile phone"
-                className="w-full max-w-sm object-contain sm:max-w-md"
+                className="w-full max-w-xs object-contain sm:max-w-sm lg:max-w-md"
                 loading="lazy"
               />
             </div>
@@ -492,7 +635,7 @@ export default function CurrencyExchangePage() {
 
       {/* Buying forex */}
       <section className="relative overflow-hidden py-14 sm:py-16">
-        <SectionBackdrop className="opacity-[0.07]" />
+        <SectionBackdrop className="opacity-[0.09]" />
 
         <div className="container-page relative">
           <h2 className="text-center text-2xl font-bold text-brand-700 sm:text-3xl">
@@ -512,7 +655,7 @@ export default function CurrencyExchangePage() {
             Why Choose Hmax for Buying Forex?
           </h3>
 
-          <ul className="mx-auto mt-8 max-w-lg space-y-6">
+          <ul className="mx-auto mt-8 w-fit space-y-4">
             {BUYING_BENEFITS.map((benefit, index) => (
               <BenefitRow
                 key={benefit.text}
@@ -526,7 +669,7 @@ export default function CurrencyExchangePage() {
 
       {/* Selling forex */}
       <section className="relative overflow-hidden pb-14 sm:pb-16">
-        <SectionBackdrop className="opacity-[0.07]" />
+        <SectionBackdrop className="opacity-[0.09]" />
 
         <div className="container-page relative">
           <h2 className="text-center text-2xl font-bold text-brand-700 sm:text-3xl">
@@ -541,10 +684,10 @@ export default function CurrencyExchangePage() {
           </p>
 
           <h3 className="mt-12 text-center text-xl font-bold text-brand-700 sm:text-2xl">
-            What We Offer in Selling Forex
+            What We Offer in Selling Forex:
           </h3>
 
-          <ul className="mx-auto mt-8 max-w-lg space-y-6">
+          <ul className="mx-auto mt-8 w-fit space-y-4">
             {SELLING_BENEFITS.map((benefit, index) => (
               <BenefitRow
                 key={benefit.text}
@@ -558,13 +701,13 @@ export default function CurrencyExchangePage() {
 
       {/* Document requirements */}
       <section className="relative overflow-hidden bg-brand-50/70 py-12 sm:py-14">
-        <SectionBackdrop className="opacity-[0.07]" />
+        <SectionBackdrop className="opacity-[0.09]" />
 
         <div className="container-page relative space-y-4">
           {DOCUMENT_REQUIREMENTS.map((requirement) => (
             <div
               key={requirement.title}
-              className="rounded-lg border border-brand-200 px-5 py-5 text-center sm:px-8 sm:py-6"
+              className="rounded-lg border border-brand-200 bg-white/70 px-5 py-5 text-center sm:px-8 sm:py-6"
             >
               <h3 className="text-base font-bold text-brand-700 sm:text-lg">
                 {requirement.title}
@@ -584,14 +727,18 @@ export default function CurrencyExchangePage() {
         </div>
       </section>
 
-      {/* Promo cards — artwork sits behind the copy as a washed card background */}
+      {/*
+        Promo cards — the artwork is the card's scene and the copy sits low over
+        it, so the illustration reads at the top instead of being cropped behind
+        the words.
+      */}
       <section className="py-12 sm:py-14">
         <div className="container-page grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {PROMO_CARDS.map((card) => (
             <Link
               key={card.title}
               to={card.to}
-              className="group relative flex min-h-[240px] flex-col items-center justify-center overflow-hidden rounded-lg border border-brand-200 bg-white px-6 py-8 text-center transition-colors hover:border-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              className="group relative flex min-h-[260px] flex-col justify-end overflow-hidden rounded-lg border border-brand-200 bg-white px-6 pb-8 pt-32 text-center transition-colors hover:border-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
             >
               <img
                 src={card.image}
@@ -599,7 +746,7 @@ export default function CurrencyExchangePage() {
                 aria-hidden="true"
                 loading="lazy"
                 draggable="false"
-                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover opacity-25"
+                className="pointer-events-none absolute inset-x-0 top-0 h-full w-full select-none object-contain object-top p-5 opacity-30"
               />
 
               <h3 className="relative text-sm font-bold leading-snug text-brand-700 sm:text-base">
@@ -608,7 +755,7 @@ export default function CurrencyExchangePage() {
 
               <span
                 aria-hidden="true"
-                className="relative mt-5 text-2xl font-bold text-brand-600 transition-transform group-hover:translate-x-1"
+                className="relative mt-4 text-2xl font-bold text-brand-600 transition-transform group-hover:translate-x-1"
               >
                 &rarr;
               </span>

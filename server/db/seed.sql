@@ -14,10 +14,6 @@ INSERT INTO currencies (code, name, flag_emoji, is_popular, display_order) VALUE
   ('EUR', 'Euro',              '🇪🇺', TRUE,  4),
   ('GBP', 'Pound Sterling',    '🇬🇧', TRUE,  5),
   ('USD', 'US Dollar',         '🇺🇸', TRUE,  6),
-  ('CAD', 'Canadian Dollar',   '🇨🇦', FALSE, 7),
-  ('SGD', 'Singapore Dollar',  '🇸🇬', FALSE, 8),
-  ('JPY', 'Japanese Yen',      '🇯🇵', FALSE, 9),
-  ('THB', 'Thai Baht',         '🇹🇭', FALSE, 10)
 ON DUPLICATE KEY UPDATE
   name          = VALUES(name),
   flag_emoji    = VALUES(flag_emoji),
