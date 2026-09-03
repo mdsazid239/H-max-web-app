@@ -5,11 +5,8 @@ import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { ApiError } from '../utils/apiError.js';
 import { query, queryOne } from '../config/db.js';
-
 const router = Router();
-
 const OTP_SECRET = env.otpSecret;
-
 function hashOtp(otp, salt) {
   return crypto.createHmac('sha256', OTP_SECRET).update(`${salt}:${otp}`).digest('hex');
 }
@@ -58,11 +55,6 @@ router.post('/send', otpSendLimiter, async (req, res, next) => {
   }
 });
 
-/**
- * Verifies an OTP against the token issued by /send. Called from
- * quote.routes.js at submit time — not exposed as its own endpoint — so a
- * verified OTP is checked atomically with the quote it's protecting.
- */
 export async function verifyOtp({ mobile, otp, otpToken }) {
   if (!mobile || !otp || !otpToken) {
     throw ApiError.badRequest('Missing verification details.');

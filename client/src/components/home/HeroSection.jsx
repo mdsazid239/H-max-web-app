@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import QuoteForm from "./QuoteForm.jsx";
 import heroBackground from "../../assets/images/Background.png";
-
-/* Swap these for the artwork you want; all three exist in assets/images. */
 import RbiIcon from "../../assets/images/home.png";
 import SecureIcon from "../../assets/images/lock.png";
 import SameDayIcon from "../../assets/images/watch.png";
