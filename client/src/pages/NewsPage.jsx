@@ -97,7 +97,7 @@ import { api } from "../lib/api.js";
 import { useApiData } from "../lib/useApiData.js";
 import { formatDate } from "../lib/format.js";
 import { FALLBACK_NEWS } from "../data/fallbackData.js";
-import backgroundImage from "../assets/images/background.png";
+import backgroundImage from "../assets/images/Background.png";
 import eroupImage from "../assets/images/eroup.png";
 import reserveBankImage from "../assets/images/reserve-bank.png";
 import FlightT from "../assets/images/fight-t.png";
