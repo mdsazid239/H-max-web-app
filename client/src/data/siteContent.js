@@ -218,8 +218,8 @@ export const COMPANY = {
   tagline: 'Your Money Changer',
   blurb:
     'Your trusted RBI-authorized partner for foreign currency exchange, outward remittances, and multi-currency travel cards. Serving Mumbai since 2016.',
-  primaryPhones: ['9136926325', '9321627630'],
-  primaryEmail: 'hmaxdombivli@gmail.com',
+  primaryPhones: ['9136926325', '9321627630','7710033233','022 22643355'],
+  primaryEmail: ['hmaxdombivli@gmail.com','   Info@hmaxforex.com','   Hmaxforex@gmail.com'],
 };
 
 export const FOOTER_COLUMNS = [
