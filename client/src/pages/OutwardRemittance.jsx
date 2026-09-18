@@ -1,5 +1,5 @@
 import { useState } from "react";
-import BackgroundN from "../assets/images/background1.png";
+import BackgroundN from "../assets/images/Background1.png";
 import RightW from "../assets/images/right.png";
 import Watch from "../assets/images/watch.png";
 import Transparent from "../assets/images/transparent.png";

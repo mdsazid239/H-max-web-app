@@ -26,7 +26,7 @@
 //   );
 // }
 import { Link } from "react-router-dom";
-import logo from "../../assets/images/logo.png";
+import logo from "../../assets/images/Logo.png";
 
 export default function Logo({ className = "" }) {
   return (
